@@ -50,9 +50,9 @@ async def main():
         for vid_id in SEED_VIDEOS:
             try:
                 video = api.video(url=f"https://www.tiktok.com/@{'_'}x/video/{vid_id}")
-                comments = video.comments(count=200)
-                print(f"video {vid_id}: comments fetched")
-                for c in comments:
+                count = 0
+                async for c in video.comments(count=200):
+                    count += 1
                     text = (c.get("text") or "")
                     if not FLEX.search(text):
                         continue
@@ -69,6 +69,7 @@ async def main():
                     })
                     seen.add(uid)
                     new_targets += 1
+                print(f"video {vid_id}: {count} comments")
             except Exception as e:
                 print(f"scrape {vid_id}: {str(e)[:100]}")
             await asyncio.sleep(2)
