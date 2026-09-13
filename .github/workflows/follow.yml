@@ -1,0 +1,76 @@
+name: TikTok Follow Bot
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # 10:00 MYT
+    - cron: "0 5 * * *"   # 13:00 MYT
+    - cron: "0 8 * * *"   # 16:00 MYT
+    - cron: "0 12 * * *"  # 20:00 MYT
+  workflow_dispatch: {}
+
+jobs:
+  follow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: |
+          pip install requests
+          npm init -y
+          npm install xbogus
+
+      - name: Write cookies
+        run: |
+          echo "${{ secrets.TIKTOK_COOKIES_JSON }}" | base64 -d > tiktok_cookies.json || echo '[]' > tiktok_cookies.json
+          ls -la tiktok_cookies.json
+
+      - name: Run follow batch
+        env:
+          TIKTOK_COOKIE_HEADER: ${{ secrets.TIKTOK_COOKIE_HEADER }}
+          DAILY_LIMIT: "60"
+          BATCH_SIZE: "15"
+          MIN_DELAY: "75"
+          MAX_DELAY: "120"
+        run: |
+          python3 follow_bot.py 2>&1 | tee run_output.txt
+
+      - name: Commit state (cache/log)
+        run: |
+          git config user.name "tiktok-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "no changes" || git commit -m "bot: update state $(date -u +%F_%H%M)"
+          git push
+
+      - name: Telegram report
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+            SUMMARY=$(tail -8 run_output.txt 2>/dev/null || echo "no output")
+            python3 - "$TG_TOKEN" "$TG_CHAT" "$SUMMARY" <<'PY'
+            import json, os, sys, urllib.request
+            token, chat = sys.argv[1], sys.argv[2]
+            summary = sys.argv[3] if len(sys.argv) > 3 else ""
+            text = f"🤖 TikTok bot run:\n{summary}"
+            data = json.dumps({"chat_id": chat, "text": text}).encode()
+            req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
+                                         data=data, headers={"Content-Type": "application/json"})
+            try:
+                urllib.request.urlopen(req, timeout=20)
+            except Exception as e:
+                print("TG send err:", e)
+            PY
+          fi
