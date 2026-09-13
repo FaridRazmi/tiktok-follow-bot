@@ -29,16 +29,36 @@ for c in []:
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
-# --- signature via Node xbogus (fallback) or npm tiktok-signature ---
+# --- signature via npm tiktok-signature (X-Bogus v2 + X-Gnarly, puppeteer chromium) ---
 def make_bogus(url):
-    """Generate X-Bogus using node xbogus package."""
-    import subprocess
-    code = f"const x=require('xbogus');process.stdout.write(x('{url}','{UA}'))"
-    r = subprocess.run(["node", "-e", code], capture_output=True, text=True, cwd=str(BASE), timeout=15)
-    return r.stdout.strip()
+    """Generate X-Bogus using tiktok-signature JS (X-Bogus v2)."""
+    import subprocess, json as _json
+    code = (
+        "const { TikTokSignature } = require('tiktok-signature');"
+        "(async () => {"
+        "  const s = new TikTokSignature('" + UA + "');"
+        "  await s.init();"
+        "  const sig = await s.sign('" + url + "');"
+        "  process.stdout.write(JSON.stringify(sig));"
+        "  await s.close();"
+        "})().catch(e => { process.stderr.write(String(e)); process.exit(1); });"
+    )
+    r = subprocess.run(["node", "-e", code], capture_output=True, text=True,
+                       cwd=str(BASE), timeout=90)
+    if r.returncode != 0:
+        print("  sig err:", r.stderr[-200:])
+        return ""
+    try:
+        obj = json.loads(r.stdout.strip())
+        return obj.get("X-Bogus") or ""
+    except Exception:
+        return ""
 
 def sign_url(url):
     """Append X-Bogus to URL."""
+    qs = urllib.parse.urlencode(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+    base = url.split("?")[0]
+    # sign a normalized version (varies by lib expectations)
     sig = make_bogus(url)
     sep = "&" if "?" in url else "?"
     return f"{url}{sep}X-Bogus={sig}"

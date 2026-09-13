@@ -27,7 +27,9 @@ jobs:
         run: |
           pip install requests
           npm init -y
-          npm install xbogus
+          npm install tiktok-signature
+          npx puppeteer browsers install chrome-headless-shell || true
+          node -e "const s=require('tiktok-signature'); console.log('tk sig loaded:', typeof s.TikTokSignature)"
 
       - name: Write cookies
         run: |
@@ -45,12 +47,18 @@ jobs:
           python3 follow_bot.py 2>&1 | tee run_output.txt
 
       - name: Commit state (cache/log)
+        env:
+          BOT_PAT: ${{ secrets.BOT_PAT }}
         run: |
           git config user.name "tiktok-bot"
           git config user.email "bot@users.noreply.github.com"
           git add -A
           git diff --cached --quiet && echo "no changes" || git commit -m "bot: update state $(date -u +%F_%H%M)"
-          git push
+          if [ -n "$BOT_PAT" ]; then
+            git push "https://x-access-token:${BOT_PAT}@github.com/FaridRazmi/tiktok-follow-bot.git" HEAD:main
+          else
+            git push
+          fi
 
       - name: Telegram report
         if: always()
@@ -58,19 +66,5 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
         run: |
-          if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
-            SUMMARY=$(tail -8 run_output.txt 2>/dev/null || echo "no output")
-            python3 - "$TG_TOKEN" "$TG_CHAT" "$SUMMARY" <<'PY'
-            import json, os, sys, urllib.request
-            token, chat = sys.argv[1], sys.argv[2]
-            summary = sys.argv[3] if len(sys.argv) > 3 else ""
-            text = f"🤖 TikTok bot run:\n{summary}"
-            data = json.dumps({"chat_id": chat, "text": text}).encode()
-            req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
-                                         data=data, headers={"Content-Type": "application/json"})
-            try:
-                urllib.request.urlopen(req, timeout=20)
-            except Exception as e:
-                print("TG send err:", e)
-            PY
-          fi
+          chmod +x tg_report.sh
+          ./tg_report.sh "$TG_TOKEN" "$TG_CHAT" run_output.txt
