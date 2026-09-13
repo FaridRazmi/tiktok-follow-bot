@@ -19,17 +19,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
       - name: Install deps
         run: |
-          pip install requests
-          npm init -y
-          npm install tiktok-signature
-          npx puppeteer browsers install chrome-headless-shell || true
-          node -e "const s=require('tiktok-signature'); console.log('tk sig loaded:', typeof s.TikTokSignature)"
+          pip install TikTokApi playwright
+          python -m playwright install chromium --with-deps || python -m playwright install chromium
+          python -c "from TikTokApi import TikTokApi; print('TikTokApi loaded')"
 
       - name: Write cookies
         run: |
@@ -40,7 +34,7 @@ jobs:
         env:
           TIKTOK_COOKIE_HEADER: ${{ secrets.TIKTOK_COOKIE_HEADER }}
           DAILY_LIMIT: "60"
-          BATCH_SIZE: "15"
+          BATCH_SIZE: "10"
           MIN_DELAY: "75"
           MAX_DELAY: "120"
         run: |
