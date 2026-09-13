@@ -15,15 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
+          node-version: "20"
 
       - name: Install deps
         run: |
-          pip install TikTokApi playwright
-          python -m playwright install chromium --with-deps || python -m playwright install chromium
-          python -c "from TikTokApi import TikTokApi; print('TikTokApi loaded')"
+          npm init -y
+          npm install tiktok-signature puppeteer
+          node -e "const s=require('tiktok-signature'); console.log('tk sig loaded:', typeof s.TikTokSignature)"
 
       - name: Write cookies
         run: |
@@ -34,7 +34,7 @@ jobs:
         env:
           TIKTOK_COOKIE_HEADER: ${{ secrets.TIKTOK_COOKIE_HEADER }}
           DAILY_LIMIT: "60"
-          BATCH_SIZE: "10"
+          BATCH_SIZE: "15"
           MIN_DELAY: "75"
           MAX_DELAY: "120"
         run: |
