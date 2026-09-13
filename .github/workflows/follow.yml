@@ -23,6 +23,8 @@ jobs:
         run: |
           npm init -y
           npm install tiktok-signature puppeteer
+          npx puppeteer browsers install chromium
+          echo "CHROME_PATH=$(npx puppeteer browsers install chromium --path 2>/dev/null | tail -1 || true)" >> $GITHUB_ENV
           node -e "const s=require('tiktok-signature'); console.log('tk sig loaded:', typeof s.TikTokSignature)"
 
       - name: Write cookies
@@ -33,10 +35,10 @@ jobs:
       - name: Run follow batch
         env:
           TIKTOK_COOKIE_HEADER: ${{ secrets.TIKTOK_COOKIE_HEADER }}
-          DAILY_LIMIT: "60"
-          BATCH_SIZE: "15"
-          MIN_DELAY: "75"
-          MAX_DELAY: "120"
+          DAILY_LIMIT: "5"
+          BATCH_SIZE: "1"
+          MIN_DELAY: "10"
+          MAX_DELAY: "15"
         run: |
           python3 follow_bot.py 2>&1 | tee run_output.txt
 
