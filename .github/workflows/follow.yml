@@ -23,8 +23,7 @@ jobs:
         run: |
           npm init -y
           npm install tiktok-signature puppeteer
-          npx puppeteer browsers install chromium
-          echo "CHROME_PATH=$(npx puppeteer browsers install chromium --path 2>/dev/null | tail -1 || true)" >> $GITHUB_ENV
+          npx puppeteer browsers install chrome-headless-shell || npx puppeteer browsers install chromium || true
           node -e "const s=require('tiktok-signature'); console.log('tk sig loaded:', typeof s.TikTokSignature)"
 
       - name: Write cookies
